@@ -2588,7 +2588,7 @@ begin
         mov     ah, $58          { set alloc strategy }
         mov     al, 1
         xor     bh,bh
-        mov     bl, $41
+        mov     bl, $81          { use last fit }
         int     $21
 
         mov     ah, $58          { get UMB link state }
