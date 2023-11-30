@@ -1559,31 +1559,19 @@ end;
 ---- MODULE 7: XT specific routines                                 -----
 ------------------------------------------------------------------------}
 
-
-CONST
-        { keyboard commands }
-        DisableKeyboard = $AD;
-        EnableKeyboard  = $AE;
-
 {************************************************************************
-** EnableKeyboardProc: enable keyboard hardware                        **
+** EnableKeyboardProc: clear keyboard buffer                           **
 ** ------------------------------------------------------------------- **
 ** IN:   -                                                             **
-** OUT:  AX and CX are trashed                                         **
+** OUT:  AL is trashed                                                 **
 *************************************************************************}
 Procedure EnableKeyboardProc; assembler;
-label WaitReady2;
 asm
-      XOR       CX, CX       { counter to 65535! }
-
-WaitReady2:
-     IN         AL, $64      { read status register }
-     TEST       AL, 2        { bit 1 set: input buffer full? }
-     LOOPNZ     WaitReady2   { loop until timeout or bit 1 clear }
-
-     MOV        AL, EnableKeyboard
-     OUT        $64, AL      { send the enable command }
-
+     IN         AL, $61   { read status register }
+     OR         AL, $F0   { set bit 7, clear keyboard }
+     OUT        $61, AL   { clear keyboard }
+     AND        AL, $7F   { clear bit 7 }
+     OUT        $61, AL   { toggle clear bit to reenable keyboard }
 end;
 
 
@@ -1620,15 +1608,6 @@ Start:
      CLI                  { disable hardware ints }
      XOR        CX,CX
      MOV        ES,CX
-     DEC        CX            { counter to 65535! }
-
-WaitReady1:
-     IN         AL, $64       { read status register }
-     TEST       AL, 2         { bit 1 set: input buffer full? }
-     LOOPNZ     WaitReady1    { loop until timeout or bit 1 clear }
-
-     MOV        AL, DisableKeyboard
-     OUT        $64, AL       { send the disable command }
 
      {-- Read and authenticate scancode --}
      IN         AL, $60      { get scancode to AL }
@@ -1666,7 +1645,7 @@ EndProcessPause:
      JMP        LeaveInt
 
 ChainToOld:
-     CALL       EnableKeyboardProc
+     { CALL EnableKeyboardProc -- not needed, OldInt9h will clear buffer }
      PUSHF
      STI
      CALL       DWORD PTR CS:[Offset OldInt9h]
@@ -2588,7 +2567,7 @@ begin
         mov     ah, $58          { set alloc strategy }
         mov     al, 1
         xor     bh,bh
-        mov     bl, $81          { use last fit }
+        mov     bl, $82          { last fit, try high then low }
         int     $21
 
         mov     ah, $58          { get UMB link state }
